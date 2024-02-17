@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -36,10 +37,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.example.compressphotowithworkmanager.Worker.Companion.KEY_COMPRESSION_THRESHOLD
 import com.example.compressphotowithworkmanager.Worker.Companion.KEY_CONTENT_URI
 import com.example.compressphotowithworkmanager.Worker.Companion.KEY_RESULT_PATH
@@ -82,43 +85,43 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Log.d("mmmmmmmmmmmmm","this is uncompressedUri ${viewModel.uncompressedUri}  ")
                         viewModel.uncompressedUri?.let {
                             Text(text = "Uncompressed photo:")
-//                            BoxWithConstraints(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .aspectRatio(1280f / 959f)
-//                            ) {
-//                                val state =
-//                                    rememberTransformableState { zoomChange, panChange, rotationChange ->
-//                                        scale = (scale * zoomChange).coerceIn(1f, 5f)
-//
-//                                        val extraWidth = (scale - 1) * constraints.maxWidth
-//                                        val extraHeight = (scale - 1) * constraints.maxHeight
-//
-//                                        val maxX = extraWidth / 2
-//                                        val maxY = extraHeight / 2
-//
-//                                        offset = Offset(
-//                                            x = (offset.x + scale * panChange.x).coerceIn(
-//                                                -maxX,
-//                                                maxX
-//                                            ),
-//                                            y = (offset.y + scale * panChange.y).coerceIn(
-//                                                -maxY,
-//                                                maxY
-//                                            ),
-//                                        )
-//                                    }
-//                                AsyncImage(model = it, contentDescription = null, modifier = Modifier.graphicsLayer {
-//                                    scaleX = scale
-//                                    scaleY = scale
-//                                    translationX = offset.x
-//                                    translationY = offset.y
-//                                }
-//                                    .transformable(state))
-//                            }
-                            AsyncImage(model = it, contentDescription = null)
+                            BoxWithConstraints(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1280f / 959f)
+                            ) {
+                                val state =
+                                    rememberTransformableState { zoomChange, panChange, rotationChange ->
+                                        scale = (scale * zoomChange).coerceIn(1f, 5f)
+
+                                        val extraWidth = (scale - 1) * constraints.maxWidth
+                                        val extraHeight = (scale - 1) * constraints.maxHeight
+
+                                        val maxX = extraWidth / 2
+                                        val maxY = extraHeight / 2
+
+                                        offset = Offset(
+                                            x = (offset.x + scale * panChange.x).coerceIn(
+                                                -maxX,
+                                                maxX
+                                            ),
+                                            y = (offset.y + scale * panChange.y).coerceIn(
+                                                -maxY,
+                                                maxY
+                                            ),
+                                        )
+                                    }
+                                SubcomposeAsyncImage(model = it, contentDescription = null, modifier = Modifier.graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = offset.x
+                                    translationY = offset.y
+                                }
+                                    .transformable(state))
+                            }
                         }
                             Spacer(modifier = Modifier.height(16.dp))
                             viewModel.compressedBitmap?.let {
@@ -139,6 +142,7 @@ class MainActivity : ComponentActivity() {
                 intent?.getParcelableExtra(Intent.EXTRA_STREAM)
             } ?: return
             viewModel.updateUncompressUri(uri)
+            Log.d("ssssssss","Uri is $uri")
 
             val request = OneTimeWorkRequestBuilder<Worker>()
                 .setInputData(
@@ -155,17 +159,43 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun Greeting(name: String, modifier: Modifier = Modifier) {
-        Text(
-            text = "Hello $name!",
-            modifier = modifier
-        )
+    fun MainScreen(viewModel: MainViewModel, workManager: WorkManager,) {
+        val workerResult = viewModel.workId?.let { id ->
+            workManager.getWorkInfoByIdLiveData(id).observeAsState().value
+        }
+        LaunchedEffect(key1 = workerResult?.outputData) {
+            if(workerResult?.outputData != null) {
+                val filePath = workerResult.outputData.getString(
+                    KEY_RESULT_PATH
+                )
+                filePath?.let {
+                    val bitmap = BitmapFactory.decodeFile(it)
+                    viewModel.updateCompressedBitmap(bitmap)
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            viewModel.uncompressedUri?.let {
+                Text(text = "Uncompressed photo:")
+                AsyncImage(model = it, contentDescription = null)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            viewModel.compressedBitmap?.let {
+                Text(text = "Uncompressed photo:")
+                Image(bitmap = it.asImageBitmap(), contentDescription = null)
+            }
+        }
     }
+
 
     @Preview(showBackground = true)
     @Composable
     fun GreetingPreview() {
         CompressPhotoWithWorkManagerTheme {
-            Greeting("Android")
         }
     }
